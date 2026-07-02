@@ -18,13 +18,16 @@ UNC .zip ──下載/解壓──► image dir ──flash_all.bat──► 裝
 
 ## 用法
 
-在 Windows 上建議用 **`run.bat`**（雙擊或執行）而非直接叫 python —— 它跑完會 `pause`，
-**視窗不會自動關閉**，可以看到結果；參數會原樣傳入（例如 `run.bat --ask`、`run.bat --skip-flash`）。
+建議用 launcher 而非直接叫 python —— 它跑完會停住顯示結果（Windows 用 `run.bat` 的
+`pause`，Linux/macOS/WSL 用 `run.sh`，互動終端會等你按 Enter），**視窗不會一結束就關**；
+參數原樣傳入（例如 `run.bat --ask`、`./run.sh --skip-flash`）。
 就算直接關視窗，結果仍存於 `_ut_work/results/result.json` 與 `_ut_work/logs/`。
 
 ```bash
 run.bat                                     # Windows launcher（跑完停住顯示結果）
 run.bat --ask
+./run.sh                                    # Linux/macOS/WSL launcher（同上）
+./run.sh --skip-flash
 python autotest.py                          # 直接跑（視窗可能一結束就關）
 python autotest.py --build \\host\path\CMBUILD     # 給目錄，自動挑最新 .zip
 python autotest.py --build \\host\path\build.zip   # 給指定 .zip
