@@ -1,7 +1,12 @@
 # auto_ut — SW6100 自動下載 / 燒入 / 測試框架
 
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Dependencies](https://img.shields.io/badge/deps-stdlib%20only-brightgreen.svg)](#)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)](#)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+
 給一個遠端 build 位置，自動 **下載 → 燒入 → 確認開機正常 → 接續跑測試 → 回報**（console + JSON）。
-Windows、單機一台裝置、Python 3.10 純標準庫（無第三方相依）。
+單機一台裝置、Python 3.10 純標準庫（無第三方相依）。Windows 用 `flash_all.bat`、Linux 用 `flash_all.sh`。
 
 ## 流程
 
@@ -72,3 +77,7 @@ tests/
 - **換燒入方式**（EDL / QFIL / python-fastboot）：在 `core/flasher.py` 加一個 `Flasher` 子類，實作 `flash(image_dir, device)`，在 `autotest.py` 換掉即可。
 - **換下載方式**（HTTP / scp）：加一個 `Downloader` 子類，實作 `fetch() -> image_dir`。
 - **加測試**：在 `tests/` 新增一檔，寫 `Test` 子類（`name`、`check(device)->(ok, detail)`；要擋後續就 `critical=True`），再加進 `autotest.py` 的 `build_tests()`。
+
+## License
+
+MIT — 見 [LICENSE](LICENSE)。
