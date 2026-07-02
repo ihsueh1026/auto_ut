@@ -23,8 +23,13 @@ class Flasher(ABC):
 
 
 class FastbootBatFlasher(Flasher):
-    """Enter fastboot via `adb reboot bootloader`, run flash_all.bat from the
-    image dir, then `fastboot reboot`."""
+    """Enter fastboot via `adb reboot bootloader`, run the flash script from the
+    image dir, then `fastboot reboot`.
+
+    Picks the runner by the script's extension: `.bat` -> Windows shell; anything
+    else (`.sh`) -> bash. Failure is detected from BOTH the exit code (the vendor
+    flash_all.sh exits non-zero on a failed flash) and error strings in the output
+    (flash_all.bat continues past a failure, so its output must be scanned)."""
 
     def __init__(self, flash_bat: Path, fastboot_wait_s=90, flash_timeout_s=1800,
                  log_dir: Path = None, log=print):
@@ -49,26 +54,32 @@ class FastbootBatFlasher(Flasher):
                 raise FlashError("device did not enter fastboot mode")
         self.log("[flash] fastboot device present")
 
-        # 2) run flash_all.bat with cwd = image dir (its image paths are relative)
+        # 2) run the flash script with cwd = image dir (its paths are relative)
         self.log(f"[flash] running {self.flash_bat.name} in {image_dir}")
-        out = self._run_bat(image_dir)
+        rc, out = self._run_script(image_dir)
         self._save_log(out)
-        if "FAILED" in out or "error:" in out.lower():
-            raise FlashError("fastboot reported an error - see flash log")
+        lo = out.lower()
+        if rc != 0 or "FAILED" in out or "error:" in lo or "flash failed" in lo:
+            raise FlashError(f"flash script reported failure (rc={rc}) - see flash log")
 
-        # 3) reboot into the OS (flash_all.bat does not reboot itself) --------
+        # 3) reboot into the OS (the flash script does not reboot itself) -----
         rc, rout = device.fastboot_reboot()
         if rc != 0:
             raise FlashError(f"fastboot reboot failed: {rout}")
         self.log("[flash] flashing done, device rebooting")
 
-    def _run_bat(self, image_dir: Path) -> str:
+    def _run_script(self, image_dir: Path):
+        """Returns (returncode, combined_output)."""
+        if self.flash_bat.suffix.lower() == ".bat":
+            argv, use_shell = [str(self.flash_bat)], True   # Windows: cmd runs .bat
+        else:
+            argv, use_shell = ["bash", str(self.flash_bat)], False   # .sh via bash
         try:
             p = subprocess.run(
-                [str(self.flash_bat)], cwd=str(image_dir),
+                argv, cwd=str(image_dir),
                 stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                shell=True, timeout=self.flash_timeout_s)
-            return (p.stdout or "") + (p.stderr or "")
+                shell=use_shell, timeout=self.flash_timeout_s)
+            return p.returncode, (p.stdout or "") + (p.stderr or "")
         except subprocess.TimeoutExpired as e:
             raise FlashError(f"flash timed out after {self.flash_timeout_s}s") from e
 

@@ -1,4 +1,5 @@
 """Auto-UT configuration (defaults; most are overridable on the CLI)."""
+import os
 from pathlib import Path
 
 # --- Build source: the exact build .zip to download & flash. The weekly folder
@@ -15,8 +16,11 @@ BUILD_ZIP = (
 #     current working dir is (Outlook / cmd launch it with a different CWD). -----
 WORK_DIR = Path(__file__).resolve().with_name("_ut_work")
 
-# --- Flashing (current method = fastboot via flash_all.bat) --------------------
-FLASH_BAT = Path(__file__).resolve().with_name("flash_all.bat")
+# --- Flashing (current method = fastboot). Windows uses flash_all.bat; Linux/
+#     macOS uses flash_all.sh (the vendor XML-driven flasher). Picked by OS. -----
+_HERE = Path(__file__).resolve().parent
+FLASH_SCRIPT = _HERE / ("flash_all.bat" if os.name == "nt" else "flash_all.sh")
+FLASH_BAT = FLASH_SCRIPT   # back-compat alias
 # A distinctive image that only exists in the fastboot image dir; used to locate
 # the image dir inside the unzipped build tree.
 IMAGE_MARKER = "super.img"

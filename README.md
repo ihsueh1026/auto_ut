@@ -12,7 +12,10 @@ UNC .zip ──下載/解壓──► image dir ──flash_all.bat──► 裝
 ```
 
 1. **下載**：從 UNC 分享路徑複製 build `.zip`（同大小則沿用快取），解壓到 `_ut_work/images/<name>/`，用 `super.img` 定位 fastboot image 目錄。
-2. **燒入**：`adb reboot bootloader` → 等 fastboot → 在 image 目錄執行 `flash_all.bat` → `fastboot reboot`。
+2. **燒入**：`adb reboot bootloader` → 等 fastboot → 在 image 目錄執行燒錄腳本 → `fastboot reboot`。
+   燒錄腳本**依 OS 自動選**：Windows = `flash_all.bat`（硬編 partition 清單）、Linux/macOS =
+   `flash_all.sh`（廠商 XML 驅動版，讀 image 目錄的 `rawprogram0.xml`，需 `xmllint`；失敗即 `exit`）。
+   失敗判定同時看 exit code 與輸出的 `FAILED`/`error:`/`flash failed`。
 3. **開機健檢**（critical）：等 `sys.boot_completed==1`、確認 shell 有回應、掃 crash log。critical 若失敗，其餘測試標記 SKIP。
 4. **回報**：console 摘要 + `_ut_work/results/result.json`（另存時間戳副本）。
 
@@ -56,7 +59,7 @@ config.py              預設值（build 來源、逾時、工具路徑）
 core/
   device.py            adb/fastboot 封裝 + 各種等待（皆 stdin=DEVNULL）
   downloader.py        Downloader ABC；UncZipDownloader / LocalDirDownloader
-  flasher.py           Flasher ABC；FastbootBatFlasher（跑 flash_all.bat）
+  flasher.py           Flasher ABC；FastbootBatFlasher（依 OS 跑 flash_all.bat / flash_all.sh）
   runner.py            依序執行測試 + critical gating
   reporter.py          console + result.json
 tests/
