@@ -1,0 +1,19 @@
+# working area: downloads (multi-GB), extracted images, logs, results, seen-list
+_ut_work/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# outlook mail samples (may contain internal build/server info)
+*.msg
+
+# editor / OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
