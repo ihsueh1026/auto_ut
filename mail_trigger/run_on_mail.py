@@ -44,7 +44,7 @@ def _mark_seen(msg_id: str):
 
 
 def handle(msg_id: str, subject: str, body: str, sender: str = "",
-           dry_run=False, manual=False) -> int:
+           dry_run=False, manual=False, tests: str = "all") -> int:
     # manual (button) triggers are deliberate: skip whitelist + de-dup.
     if not manual:
         if not all(s in subject for s in SUBJECT_MUST_CONTAIN):
@@ -63,13 +63,17 @@ def handle(msg_id: str, subject: str, body: str, sender: str = "",
         return 4
     print(f"[trigger] build = {build}")
 
+    tests = (tests or "all").strip() or "all"
+    cmd = [sys.executable, str(AUTOTEST), "--build", build, "--tests", tests]
+    print(f"[trigger] tests = {tests}")
+
     _mark_seen(msg_id)          # mark before running so a crash won't re-trigger
     if dry_run:
-        print("[dry-run] would launch:", sys.executable, str(AUTOTEST), "--build", build)
+        print("[dry-run] would launch:", *cmd)
         return 0
 
     # detached-friendly: run autotest and stream its output; its own logs/JSON persist
-    p = subprocess.run([sys.executable, str(AUTOTEST), "--build", build])
+    p = subprocess.run(cmd)
     print(f"[done] autotest exit code = {p.returncode}")
     return p.returncode
 
@@ -83,13 +87,16 @@ def main(argv=None):
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--manual", action="store_true",
                     help="deliberate button trigger: skip whitelist + de-dup")
+    ap.add_argument("--tests", default="all",
+                    help="which tests to run (passed through to autotest.py): "
+                         "comma list of keys/case-ids, or 'all'")
     a = ap.parse_args(argv)
 
     if a.body_file:
         body = Path(a.body_file).read_text(encoding="utf-8", errors="replace")
     else:
         body = sys.stdin.read() if not sys.stdin.isatty() else ""
-    return handle(a.id, a.subject, body, a.sender, a.dry_run, a.manual)
+    return handle(a.id, a.subject, body, a.sender, a.dry_run, a.manual, a.tests)
 
 
 if __name__ == "__main__":

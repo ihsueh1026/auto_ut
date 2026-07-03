@@ -29,6 +29,12 @@ IMAGE_MARKER = "super.img"
 ADB = "adb"
 FASTBOOT = "fastboot"
 
+# --- SerDes / LSLink tests -----------------------------------------------------
+# lslink_cli as invoked over `adb shell` (on PATH here; use "/data/lslink_cli"
+# if it was pushed there instead).
+LSLINK_CLI = "lslink_cli"
+SERDES_PING_NODE = "/sys/bus/i2c/devices/9-0020/ping"
+
 # --- Timeouts (seconds) --------------------------------------------------------
 FASTBOOT_WAIT_S = 90       # after `adb reboot bootloader`, wait for fastboot
 FLASH_TIMEOUT_S = 1800     # flash_all.bat whole run

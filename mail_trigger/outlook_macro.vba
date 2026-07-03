@@ -9,20 +9,26 @@
 '    2. IMPORTANT: right-click the project > Insert > Module. Paste this block
 '       into that standard MODULE - NOT into "ThisOutlookSession". Macros in
 '       ThisOutlookSession do NOT show up in the button (QAT) macro list.
-'    3. Edit PY and RUN_ON_MAIL paths below. File > Save.
-'    4. Restart Outlook (enable macros if Trust Center prompts).
-'    5. Add it as a button:
+'    3. Insert > UserForm. In its Properties window set (Name) = frmTests. Leave
+'       it EMPTY (no controls) - double-click it to open its code window and
+'       paste the whole outlook_frmTests.vba block there. The checkboxes are
+'       created by code, so you never drag any controls. (This needs NO "trust
+'       access to the VBA project object model".)
+'    4. Edit PY and RUN_ON_MAIL paths below. File > Save.
+'    5. Restart Outlook (enable macros if Trust Center prompts).
+'    6. Add it as a button:
 '         File > Options > Quick Access Toolbar >
 '         "Choose commands from" dropdown = Macros >
 '         pick "Project1.TriggerAutotestOnSelectedMail" > Add >> OK.
 '       A button appears on the QAT; click it while a build mail is selected.
 '
-'  It hands subject + body + EntryID to run_on_mail.py with --manual
+'  It pops a checkbox dialog (frmTests: boot / serdes) to pick test items, then
+'  hands subject + body + EntryID + --tests to run_on_mail.py with --manual
 '  (which skips the whitelist + de-dup, since you clicked deliberately).
 ' ============================================================================
 Option Explicit
 
-Private Const PY As String = "C:\Python310\python.exe"
+Private Const PY As String = "C:\Users\ali_lin\AppData\Local\Microsoft\WindowsApps\python.exe"
 Private Const RUN_ON_MAIL As String = "D:\claude\sw6100\auto_ut\mail_trigger\run_on_mail.py"
 
 Public Sub TriggerAutotestOnSelectedMail()
@@ -33,10 +39,33 @@ Public Sub TriggerAutotestOnSelectedMail()
         Exit Sub
     End If
 
-    If MsgBox("Trigger autotest for this mail?" & vbCrLf & vbCrLf & _
-              "Subject: " & m.Subject, vbQuestion + vbYesNo, "Auto-UT") <> vbYes Then
+    ' one dialog: pick which test items to run (checkbox form -> autotest
+    ' --tests). Its Run/Cancel IS the confirmation; none ticked = "all".
+    ' frmTests builds its checkboxes dynamically and shows the mail subject.
+    '
+    ' Late-bound (Dim f As Object + UserForms.Add) so this Module compiles even
+    ' before the UserForm exists; if it's missing we show a clear message rather
+    ' than a "User-defined type not defined" compile error on 'frmTests'.
+    Dim f As Object, tests As String
+    On Error Resume Next
+    Set f = UserForms.Add("frmTests")
+    On Error GoTo 0
+    If f Is Nothing Then
+        MsgBox "UserForm 'frmTests' not found." & vbCrLf & vbCrLf & _
+               "In the VBA editor: Insert > UserForm, set its (Name) property to " & _
+               "frmTests, then paste outlook_frmTests.vba into that form's code " & _
+               "window. Leave the form otherwise empty.", vbCritical, "Auto-UT"
         Exit Sub
     End If
+    f.MailSubject = m.Subject
+    f.Show                                       ' modal
+    If f.Cancelled Then
+        Unload f
+        Exit Sub
+    End If
+    tests = f.Result
+    Unload f
+    If Len(tests) = 0 Then tests = "all"
 
     ' body -> temp file (avoids command-line length / quoting limits)
     Dim tmp As String
@@ -55,6 +84,7 @@ Public Sub TriggerAutotestOnSelectedMail()
           " --id """ & m.EntryID & """" & _
           " --subject """ & Replace(m.Subject, """", "'") & """" & _
           " --sender """ & sender & """" & _
+          " --tests """ & tests & """" & _
           " --body-file """ & tmp & """"
 
     ' cmd /k keeps the console open so you can read the result.

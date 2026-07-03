@@ -29,6 +29,7 @@ from core.runner import run_tests
 from core.reporter import report
 from tests.base import TestResult, FAIL, ERROR
 from tests.test_boot_health import BootHealthTest
+from tests.test_serdes import SerDesTest
 
 
 class Tee:
@@ -45,13 +46,41 @@ class Tee:
         self.fh.flush()
 
 
+# Test registry: (canonical key, {aliases}, factory(args)). Order = run order.
+# Boot health runs first and is critical (if it fails the device isn't usable,
+# so the rest are SKIPped). `--tests` selects a subset by key/alias/case-id.
+TEST_REGISTRY = [
+    ("boot", {"boot", "boot_health"},
+     lambda a: BootHealthTest(boot_timeout_s=a.boot_timeout)),
+    ("serdes", {"serdes", "lslink", "platform_serdes.gzi3"},
+     lambda a: SerDesTest(cli=config.LSLINK_CLI, ping_node=config.SERDES_PING_NODE)),
+]
+
+
+def test_keys():
+    """Human-readable list of selectable keys for --help / the mail prompt."""
+    return ", ".join(k for k, _, _ in TEST_REGISTRY)
+
+
 def build_tests(args):
-    """The plug-in point for adding tests. Boot health runs first and is
-    critical (if it fails the device isn't usable, so the rest are skipped)."""
-    return [
-        BootHealthTest(boot_timeout_s=args.boot_timeout),
-        # add more Test subclasses here, e.g. AdbShellTest(), SensorTest(), ...
-    ]
+    """The plug-in point for adding tests. Returns the tests to run, honoring
+    --tests (comma list of keys/aliases/case-ids; 'all' or empty = everything),
+    always in registry order. Add a Test subclass by extending TEST_REGISTRY."""
+    sel = (getattr(args, "tests", "") or "all").strip().lower()
+    if sel in ("", "all", "*"):
+        return [factory(args) for _, _, factory in TEST_REGISTRY]
+
+    wanted = {t.strip() for t in sel.split(",") if t.strip()}
+    chosen, matched = [], set()
+    for key, aliases, factory in TEST_REGISTRY:
+        if wanted & ({key} | aliases):
+            chosen.append(factory(args))
+            matched |= wanted & ({key} | aliases)
+    unknown = wanted - matched
+    if unknown:
+        raise SystemExit(f"[error] unknown --tests: {', '.join(sorted(unknown))}. "
+                         f"Available: {test_keys()} (or 'all').")
+    return chosen
 
 
 def parse_args(argv):
@@ -70,6 +99,10 @@ def parse_args(argv):
                    help="reuse the already-downloaded/extracted build in --work")
     p.add_argument("--skip-flash", action="store_true",
                    help="skip download+flash; just run tests on the current device")
+    p.add_argument("--tests", default="all",
+                   help="which tests to run: comma list of keys/aliases/case-ids "
+                        "(e.g. 'boot,002' or '001'); 'all' = everything. "
+                        f"Available: {test_keys()}")
     p.add_argument("--force", action="store_true",
                    help="force re-copy and re-unzip even if cached")
     p.add_argument("--boot-timeout", type=int, default=config.BOOT_TIMEOUT_S)
@@ -98,11 +131,17 @@ def main(argv=None):
     log(f"   work       = {work}")
     log(f"   serial     = {args.serial or '(single device)'}")
     log(f"   skip-flash = {args.skip_flash}")
+    log(f"   tests      = {args.tests}")
     log("=" * 60)
 
     device = Device(serial=args.serial, adb=config.ADB, fastboot=config.FASTBOOT, log=log)
     meta = {"build": args.build if not args.local_dir else args.local_dir,
-            "serial": args.serial or "single", "skip_flash": args.skip_flash}
+            "serial": args.serial or "single", "skip_flash": args.skip_flash,
+            "tests": args.tests}
+
+    # resolve the test selection up front so a bad --tests fails before flashing
+    tests = build_tests(args)
+    log(f"[tests] selected: {', '.join(t.name for t in tests)}")
 
     results = []
 
@@ -141,7 +180,7 @@ def main(argv=None):
     # ---- tests -------------------------------------------------------------
     log("")
     log("[tests] running ...")
-    results += run_tests(build_tests(args), device, log=log)
+    results += run_tests(tests, device, log=log)
 
     # ---- report ------------------------------------------------------------
     ok = report(results, meta, work / "results", log=log)

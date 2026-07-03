@@ -52,9 +52,33 @@ python autotest.py --serial 1234abcd --force
 
 主要參數：`--build` / `--ask` / `--local-dir` / `--work` / `--serial` /
 `--skip-download`（沿用已下載的）/ `--skip-flash` / `--force` /
-`--boot-timeout` / `--fastboot-wait` / `--flash-timeout`。
+`--tests` / `--boot-timeout` / `--fastboot-wait` / `--flash-timeout`。
 
 離開碼：全部 PASS → `0`，否則 `1`。
+
+## 選測項（`--tests`）
+
+不給或給 `all` 就跑全部；否則用**逗號**列出要跑的項目（key / 別名 / case-id 皆可），依註冊順序執行：
+
+| key | 別名 | 測什麼 |
+|-----|------|--------|
+| `boot` | `boot_health` | 開機健檢（critical，失敗會 SKIP 其餘）|
+| `serdes` | `lslink` / `Platform_SerDes.GZI3` | SerDes/LSLink 一測項：`cat /sys/bus/i2c/devices/9-0020/ping`==`ok`（需 root）→`switch golden`→`flashid main/sub`(LS 4MiB W25Q32JW)+`main-hs/sub-hs`(HS 16MiB W25Q128JW)→`switch feature`→`version main/sub`==`0x13` |
+
+```bash
+python autotest.py --tests serdes            # 只跑 SerDes/LSLink
+python autotest.py --tests boot,serdes       # 開機健檢 + SerDes
+python autotest.py --skip-flash --tests serdes   # 不燒，只跑 SerDes 測項
+```
+
+未知的 key 會直接報錯（列出可用清單），且在**燒入前**就驗證，不會白燒一輪。
+`lslink_cli` 名稱與 ping 節點路徑在 `config.LSLINK_CLI` / `config.SERDES_PING_NODE`。
+
+**從 mail 巨集選測項**：Outlook 按鈕觸發時會跳一個**勾選視窗**（`frmTests`，列出 `boot` /
+`serdes` 供打勾，**預設只勾 `boot`**、Run/Cancel），選擇經 `run_on_mail.py --tests` 一路傳到
+`autotest.py`。巨集需安裝兩塊：`mail_trigger/outlook_macro.vba`（標準 Module）＋
+`mail_trigger/outlook_frmTests.vba`（貼進一個名為 `frmTests` 的空白 UserForm，勾選框由程式碼動態
+建立，免拉控制項、免開「信任 VBA 專案物件模型」）。
 
 ## 結構
 
@@ -70,6 +94,7 @@ core/
 tests/
   base.py              Test ABC + TestResult
   test_boot_health.py  開機健檢（critical）
+  test_serdes.py       SerDes/LSLink 單測項（ping + flashid/switch/version）
 ```
 
 ## 擴充
