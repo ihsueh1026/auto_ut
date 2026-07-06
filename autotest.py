@@ -31,6 +31,7 @@ from tests.base import TestResult, FAIL, ERROR
 from tests.test_boot_health import BootHealthTest
 from tests.test_serdes import SerDesTest
 from tests.test_sensors import SensorTest
+from tests.test_keys import KeyTest
 
 
 class Tee:
@@ -57,6 +58,8 @@ TEST_REGISTRY = [
      lambda a: SerDesTest(cli=config.LSLINK_CLI, ping_node=config.SERDES_PING_NODE)),
     ("sensors", {"sensors", "sensor", "platform_sensor.gzi3"},
      lambda a: SensorTest(json_dir=config.SENSOR_JSON_DIR)),
+    ("key", {"key", "keypad", "platform_keypad.gzi3"},
+     lambda a: KeyTest()),
 ]
 
 

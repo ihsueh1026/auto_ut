@@ -29,7 +29,8 @@ Private WithEvents btnCancel As MSForms.CommandButton
 Private Const TESTS As String = _
     "boot|Boot health  (adb device + dmesg scan);" & _
     "serdes|SerDes / LSLink  (ping + flashid / switch / version 0x13);" & _
-    "sensors|Sensors  (IMU / Mag whoami + streaming + selftest, ALS)"
+    "sensors|Sensors  (IMU / Mag whoami + streaming + selftest, ALS);" & _
+    "key|Keypad POWER  (INTERACTIVE - you must press the button)"
 
 ' keys ticked by default (comma list). Others start unticked.
 Private Const DEFAULT_ON As String = "boot"

@@ -85,7 +85,8 @@ python autotest.py --serial 1234abcd --force
 |-----|------|--------|
 | `boot` | `boot_health` | 開機健檢（critical，失敗會 SKIP 其餘）|
 | `serdes` | `lslink` / `Platform_SerDes.GZI3` | SerDes/LSLink 一測項：`cat /sys/bus/i2c/devices/9-0020/ping`==`ok`（需 root）→`switch golden`→`flashid main/sub`(LS 4MiB W25Q32JW)+`main-hs/sub-hs`(HS 16MiB W25Q128JW)→`switch feature`→`version main/sub`==`0x13` |
-| `sensors` | `sensor` / `Platform_Sensor.GZI3` | 感測器一測項（需 root，SSC `see` 工具）：IMU whoami(accel=`lsm6dsv`)/streaming/selftest(accel+gyro，`test_type` HW×2 + `test_passed:1`)、Mag whoami(`bmm350`)/streaming/selftest、ALS whoami(`tsl2522`) + lux（只判 `valid=1`+讀到 lux 數值；明暗比較為人工註記，不 FAIL） |
+| `sensors` | `sensor` / `Platform_Sensor.GZI3` | 感測器一測項（需 root，SSC `see` 工具）：IMU whoami(accel=`lsm6dsv`)/streaming/selftest(accel+gyro，`test_type` HW×2 + `test_passed:1`)、Mag whoami(`bmm350`)/streaming/selftest、ALS whoami(`tsl2522`) + lux（**互動**：提示遮光/照光各讀一次，驗 `valid=1` 且暗 lux<亮 lux；無 tty 時退回自動判 `valid=1`+數值、跳過明暗比較） |
+| `key` | `keypad` / `Platform_Keypad.GZI3` | POWER 鍵測試（**互動**）：提示後擷取 `getevent`，驗證有 KEY_POWER 按下(`0001 0074 00000001`)+放開(`...00000000`)。**需人在現場按鍵**；非互動環境（mail 觸發、無 tty）會自動 SKIP 不 FAIL |
 
 ```bash
 python autotest.py --tests serdes            # 只跑 SerDes/LSLink
@@ -119,6 +120,7 @@ tests/
   test_boot_health.py  開機健檢（critical）
   test_serdes.py       SerDes/LSLink 單測項（ping + flashid/switch/version）
   test_sensors.py      感測器單測項（IMU/Mag whoami+streaming+selftest、ALS）
+  test_keys.py         POWER 鍵測項（互動；getevent 擷取按鍵事件）
 ```
 
 ## 擴充

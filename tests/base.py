@@ -13,6 +13,11 @@ from dataclasses import dataclass, field, asdict
 PASS, FAIL, SKIP, ERROR = "PASS", "FAIL", "SKIP", "ERROR"
 
 
+class SkipTest(Exception):
+    """A test may raise this from check() to skip itself (e.g. an interactive
+    test running in a non-interactive/mail-triggered environment)."""
+
+
 @dataclass
 class TestResult:
     name: str
@@ -37,6 +42,8 @@ class Test:
         try:
             ok, detail = self.check(device)
             status = PASS if ok else FAIL
+        except SkipTest as e:
+            status, detail = SKIP, str(e)
         except Exception:
             status, detail = ERROR, "exception:\n" + traceback.format_exc()
         return TestResult(self.name, status, detail, round(time.time() - t0, 1))

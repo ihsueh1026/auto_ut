@@ -54,6 +54,13 @@ ALS_INPUT_DIR = "/sys/bus/i2c/devices/9-0039/input"
 ALS_WHOAMI = "tsl2522"
 ALS_NODE_NAME = "als"
 
+# --- Key / keypad test (interactive; someone must press the button) ------------
+# getevent prints `<node>: <type> <code> <value>`; POWER = EV_KEY(0001) KEY_POWER
+# (0074) with value 00000001 (down) / 00000000 (up).
+KEY_EV_TYPE = "0001"
+KEY_POWER_CODE = "0074"
+KEY_CAPTURE_S = 8              # seconds to capture getevent while you press
+
 # --- Timeouts (seconds) --------------------------------------------------------
 FASTBOOT_WAIT_S = 90       # after `adb reboot bootloader`, wait for fastboot
 FLASH_TIMEOUT_S = 1800     # flash_all.bat whole run

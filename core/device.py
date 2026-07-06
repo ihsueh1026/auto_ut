@@ -43,6 +43,19 @@ class Device:
             self._echo_shell(cmd, rc, out)
         return rc, out
 
+    def capture_shell(self, cmd, seconds, tmp="/data/local/tmp/_ut_capture.txt"):
+        """Run `cmd` on the device for ~`seconds` (backgrounded, then killed) and
+        return what it wrote. Used for blocking tools like getevent: the device
+        captures to a file so there is no host-side pipe/kill race."""
+        run = (f"{cmd} > {tmp} 2>&1 & p=$!; sleep {seconds}; "
+               f"kill $p 2>/dev/null; wait $p 2>/dev/null")
+        self.adb("shell", run, timeout=seconds + 20)
+        rc, out = self.adb("shell", "cat " + tmp, timeout=20)
+        self.adb("shell", "rm -f " + tmp, timeout=15)
+        if self.verbose:
+            self._echo_shell(f"{cmd}  (capture {seconds}s)", rc, out)
+        return out if rc == 0 else ""
+
     def _echo_shell(self, cmd, rc, out, max_lines=200):
         """Live-print a shell command + its output through self.log (verbose)."""
         self.log(f"[sh] {cmd}")
