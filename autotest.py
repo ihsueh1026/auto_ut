@@ -32,6 +32,7 @@ from tests.test_boot_health import BootHealthTest
 from tests.test_serdes import SerDesTest
 from tests.test_sensors import SensorTest
 from tests.test_keys import KeyTest
+from tests.test_camera import CameraTest
 
 
 class Tee:
@@ -60,6 +61,8 @@ TEST_REGISTRY = [
      lambda a: SensorTest(json_dir=config.SENSOR_JSON_DIR)),
     ("key", {"key", "keypad", "platform_keypad.gzi3"},
      lambda a: KeyTest()),
+    ("camera", {"camera", "optical_camera", "optical_camera.gzi3"},
+     lambda a: CameraTest(boot_timeout_s=a.boot_timeout)),
 ]
 
 

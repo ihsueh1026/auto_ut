@@ -44,7 +44,8 @@ def _mark_seen(msg_id: str):
 
 
 def handle(msg_id: str, subject: str, body: str, sender: str = "",
-           dry_run=False, manual=False, tests: str = "all") -> int:
+           dry_run=False, manual=False, tests: str = "all",
+           test_only=False) -> int:
     # manual (button) triggers are deliberate: skip whitelist + de-dup.
     if not manual:
         if not all(s in subject for s in SUBJECT_MUST_CONTAIN):
@@ -58,14 +59,24 @@ def handle(msg_id: str, subject: str, body: str, sender: str = "",
             return 3
 
     build = extract_build_zip(subject, body)
-    if not build:
-        print("[error] could not extract a build .zip path from subject/body")
+    # "Test only" doesn't download/flash, so the build path is optional there;
+    # only the flash path truly needs it.
+    if not build and not test_only:
+        print("[error] could not extract a build .zip path from subject/body.\n"
+              "        (If you only want to re-run tests on the current build, "
+              "tick 'Test only' - it doesn't need a build path.)")
         return 4
-    print(f"[trigger] build = {build}")
 
     tests = (tests or "all").strip() or "all"
-    cmd = [sys.executable, str(AUTOTEST), "--build", build, "--tests", tests]
-    print(f"[trigger] tests = {tests}")
+    cmd = [sys.executable, str(AUTOTEST), "--tests", tests]
+    if build:
+        cmd += ["--build", build]
+    if test_only:
+        # "Test only": run tests on the current build (no reflash) and show the
+        # live command/output log, since it's a hands-on re-run.
+        cmd += ["--skip-flash", "--verbose"]
+    print(f"[trigger] build = {build or '(none - test only)'}")
+    print(f"[trigger] tests = {tests}  test_only = {test_only}")
 
     _mark_seen(msg_id)          # mark before running so a crash won't re-trigger
     if dry_run:
@@ -90,13 +101,17 @@ def main(argv=None):
     ap.add_argument("--tests", default="all",
                     help="which tests to run (passed through to autotest.py): "
                          "comma list of keys/case-ids, or 'all'")
+    ap.add_argument("--test-only", action="store_true",
+                    help="run tests on the current build only: forward --skip-flash "
+                         "to autotest (no download / flash)")
     a = ap.parse_args(argv)
 
     if a.body_file:
         body = Path(a.body_file).read_text(encoding="utf-8", errors="replace")
     else:
         body = sys.stdin.read() if not sys.stdin.isatty() else ""
-    return handle(a.id, a.subject, body, a.sender, a.dry_run, a.manual, a.tests)
+    return handle(a.id, a.subject, body, a.sender, a.dry_run, a.manual, a.tests,
+                  a.test_only)
 
 
 if __name__ == "__main__":

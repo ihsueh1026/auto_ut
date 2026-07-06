@@ -61,6 +61,13 @@ KEY_EV_TYPE = "0001"
 KEY_POWER_CODE = "0074"
 KEY_CAPTURE_S = 8              # seconds to capture getevent while you press
 
+# --- Camera test (nativehaltest gtest; needs root + remount, reboots once) -----
+CAMERA_OVERRIDE_DIR = "/vendor/etc/camera"
+CAMERA_OVERRIDE_FILE = "/vendor/etc/camera/camxoverridesettings.txt"
+CAMERA_OVERRIDE_LINE = "enableNCSService=FALSE"
+CAMERA_PROVIDER = "vendor.camera-provider"
+CAMERA_GTEST = "nativehaltest --gtest_filter=CameraModuleTest.TestNumberOfCamera"
+
 # --- Timeouts (seconds) --------------------------------------------------------
 FASTBOOT_WAIT_S = 90       # after `adb reboot bootloader`, wait for fastboot
 FLASH_TIMEOUT_S = 1800     # flash_all.bat whole run

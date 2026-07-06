@@ -9,8 +9,8 @@
 '    2. IMPORTANT: right-click the project > Insert > Module. Paste this block
 '       into that standard MODULE - NOT into "ThisOutlookSession". Macros in
 '       ThisOutlookSession do NOT show up in the button (QAT) macro list.
-'    3. Insert > UserForm. In its Properties window set (Name) = frmTests. Leave
-'       it EMPTY (no controls) - double-click it to open its code window and
+'    3. Insert > UserForm. Keep its DEFAULT name UserForm1 (no rename needed).
+'       Leave it EMPTY (no controls) - press F7 to open its code window and
 '       paste the whole outlook_frmTests.vba block there. The checkboxes are
 '       created by code, so you never drag any controls. (This needs NO "trust
 '       access to the VBA project object model".)
@@ -22,7 +22,7 @@
 '         pick "Project1.TriggerAutotestOnSelectedMail" > Add >> OK.
 '       A button appears on the QAT; click it while a build mail is selected.
 '
-'  It pops a checkbox dialog (frmTests: boot / serdes) to pick test items, then
+'  It pops a checkbox dialog (UserForm1: boot / serdes / ...) to pick test items, then
 '  hands subject + body + EntryID + --tests to run_on_mail.py with --manual
 '  (which skips the whitelist + de-dup, since you clicked deliberately).
 ' ============================================================================
@@ -41,22 +41,15 @@ Public Sub TriggerAutotestOnSelectedMail()
 
     ' one dialog: pick which test items to run (checkbox form -> autotest
     ' --tests). Its Run/Cancel IS the confirmation; none ticked = "all".
-    ' frmTests builds its checkboxes dynamically and shows the mail subject.
+    ' UserForm1 builds its checkboxes dynamically and shows the mail subject.
     '
-    ' Late-bound (Dim f As Object + UserForms.Add) so this Module compiles even
-    ' before the UserForm exists; if it's missing we show a clear message rather
-    ' than a "User-defined type not defined" compile error on 'frmTests'.
-    Dim f As Object, tests As String
-    On Error Resume Next
-    Set f = UserForms.Add("frmTests")
-    On Error GoTo 0
-    If f Is Nothing Then
-        MsgBox "UserForm 'frmTests' not found." & vbCrLf & vbCrLf & _
-               "In the VBA editor: Insert > UserForm, set its (Name) property to " & _
-               "frmTests, then paste outlook_frmTests.vba into that form's code " & _
-               "window. Leave the form otherwise empty.", vbCritical, "Auto-UT"
-        Exit Sub
-    End If
+    ' EARLY-BOUND (New UserForm1). Outlook VBA's UserForms.Add is unreliable - it
+    ' returns Nothing even when the form exists - so use New on the form's name.
+    ' The form must exist as a UserForm named UserForm1 (the default from
+    ' Insert > UserForm). If you get a compile error "User-defined type not
+    ' defined" on UserForm1 below, that form is missing or has a different name.
+    Dim f As UserForm1, tests As String, skipFlash As Boolean
+    Set f = New UserForm1
     f.MailSubject = m.Subject
     f.Show                                       ' modal
     If f.Cancelled Then
@@ -64,6 +57,7 @@ Public Sub TriggerAutotestOnSelectedMail()
         Exit Sub
     End If
     tests = f.Result
+    skipFlash = f.SkipFlash                       ' "Test only" ticked
     Unload f
     If Len(tests) = 0 Then tests = "all"
 
@@ -86,6 +80,7 @@ Public Sub TriggerAutotestOnSelectedMail()
           " --sender """ & sender & """" & _
           " --tests """ & tests & """" & _
           " --body-file """ & tmp & """"
+    If skipFlash Then cmd = cmd & " --test-only"
 
     ' cmd /k keeps the console open so you can read the result.
     ' NOTE: the whole command is wrapped in ONE extra pair of quotes. cmd /k,
