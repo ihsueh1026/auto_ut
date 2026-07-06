@@ -85,7 +85,7 @@ python autotest.py --serial 1234abcd --force
 |-----|------|--------|
 | `boot` | `boot_health` | 開機健檢（critical，失敗會 SKIP 其餘）|
 | `serdes` | `lslink` / `Platform_SerDes.GZI3` | SerDes/LSLink 一測項：`cat /sys/bus/i2c/devices/9-0020/ping`==`ok`（需 root）→`switch golden`→`flashid main/sub`(LS 4MiB W25Q32JW)+`main-hs/sub-hs`(HS 16MiB W25Q128JW)→`switch feature`→`version main/sub`==`0x13` |
-| `sensors` | `sensor` / `Platform_Sensor.GZI3` | 感測器一測項（需 root，SSC `see` 工具）：IMU whoami(accel=`lsm6dsv`)/streaming/selftest(accel+gyro，`test_type` HW×2 + `test_passed:1`)、Mag whoami(`bmm350`)/streaming/selftest、ALS whoami(`tsl2522`) + lux（**互動**：提示遮光/照光各讀一次，驗 `valid=1` 且暗 lux<亮 lux；無 tty 時退回自動判 `valid=1`+數值、跳過明暗比較） |
+| `sensors` | `sensor` / `Platform_Sensor.GZI3` | 感測器一測項（需 root，SSC `see` 工具）：IMU whoami(accel=`lsm6dsv`)/streaming/selftest(accel+gyro，`test_type` HW×2 + `test_passed:1`)、Mag whoami(`bmm350`)/streaming/selftest、ALS whoami(`tsl2522`) + lux（`getevent -lt`＋抓 `ABS_MISC`：5–10 秒內收到至少一個 `ABS_MISC` 且值為數字就 PASS） |
 | `key` | `keypad` / `Platform_Keypad.GZI3` | POWER 鍵測試（**互動**）：提示後擷取 `getevent`，驗證有 KEY_POWER 按下(`0001 0074 00000001`)+放開(`...00000000`)。**需人在現場按鍵**；非互動環境（mail 觸發、無 tty）會自動 SKIP 不 FAIL |
 | `camera` | `optical_camera` / `Optical_Camera.GZI3` | 相機模組（需 root+remount，**中途會 `adb reboot` 一次**）：套用 `enableNCSService=FALSE` override→stop camera-provider→`nativehaltest --gtest_filter=CameraModuleTest.TestNumberOfCamera`，驗 gtest `[≥1 PASSED] and [0 FAILED]` |
 

@@ -52,7 +52,10 @@ SENSOR_SELFTEST_TYPE = "SNS_PHYSICAL_SENSOR_TEST_TYPE_HW"
 # used to locate the iio/input node that exposes config/enable + data/lux|valid.
 ALS_INPUT_DIR = "/sys/bus/i2c/devices/9-0039/input"
 ALS_WHOAMI = "tsl2522"
-ALS_NODE_NAME = "als"
+# ALS lux: capture `getevent -lt` for ALS_CAPTURE_S and require >=1 numeric
+# ALS_LUX_EVENT (the lux report input event).
+ALS_LUX_EVENT = "ABS_MISC"
+ALS_CAPTURE_S = 10            # spec: at least one ABS_MISC within 5-10 seconds
 
 # --- Key / keypad test (interactive; someone must press the button) ------------
 # getevent prints `<node>: <type> <code> <value>`; POWER = EV_KEY(0001) KEY_POWER

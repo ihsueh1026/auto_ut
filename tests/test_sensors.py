@@ -11,19 +11,16 @@ One case, non-critical, running the SSC "see" tool checks in order:
   008 Mag_Streaming         see_workhorse -sensor=mag ...              -> ACCURACY_HIGH
   009 Mag_SelfTest          see_selftest -sensor=mag -testtype=hw      -> test_type HW x2 + test_passed 1
   010 ALS_Whoami            cat .../input*/name | head -1              -> tsl2522
-  011 ALS_lux               enable ALS, read data/lux + data/valid     -> valid=1 + numeric lux
+  011 ALS_lux               getevent -lt | grep ABS_MISC              -> >=1 numeric ABS_MISC in 5-10s
 
 Self-test writes a result json under config.SENSOR_JSON_DIR; on pass we remove
-it (per the spec), on fail we keep it for debug. ALS lux is INTERACTIVE on a
-terminal: it prompts you to cover (dark) then light (bright) the sensor and
-checks valid==1 plus dark lux < bright lux. With no tty (mail-triggered) it
-falls back to auto-checking valid==1 + a numeric lux (dark/bright comparison
-skipped). Most steps need root (sysfs writes / /data/vendor), so adb root is
-attempted first.
+it (per the spec), on fail we keep it for debug. ALS lux captures input events
+for a few seconds and passes if at least one ABS_MISC (the ALS lux report)
+arrives with a numeric value. Most steps need root (sysfs / /data/vendor), so
+adb root is attempted first.
 """
 from __future__ import annotations
 import re
-import sys
 
 import config
 from tests.base import Test
@@ -80,65 +77,33 @@ class SensorTest(Test):
         ok = rc == 0 and config.ALS_WHOAMI.lower() in out.lower()
         return ("als whoami", ok, f"want {config.ALS_WHOAMI}; got '{_snip(out, 60)}'")
 
-    def _als_find_node(self, device):
-        """Return the ALS input node path (name == ALS_NODE_NAME), or ''."""
-        d, nm = config.ALS_INPUT_DIR, config.ALS_NODE_NAME
-        cmd = (f'for p in {d}/input*; do n=$(cat "$p/name" 2>/dev/null); '
-               f'if [ "$n" = "{nm}" ]; then echo "$p"; break; fi; done')
-        _, out = device.shell(cmd, timeout=15)
-        out = out.strip()
-        return out.splitlines()[-1].strip() if out else ""
-
-    def _als_read(self, device, node):
-        """Read (lux:int|None, valid:str) from an enabled ALS node."""
-        _, out = device.shell(
-            f'echo "lux=$(cat "{node}/data/lux" 2>/dev/null)"; '
-            f'echo "valid=$(cat "{node}/data/valid" 2>/dev/null)"', timeout=15)
-        mlux = re.search(r'lux=(-?\d+)', out)
-        mval = re.search(r'valid=(\d+)', out)
-        return (int(mlux.group(1)) if mlux else None,
-                mval.group(1) if mval else "?")
-
     def _als_lux(self, device):
-        node = self._als_find_node(device)
-        if not node:
+        # capture input events for a window; the ALS reports lux as ABS_MISC.
+        # PASS if >=1 ABS_MISC arrives within ALS_CAPTURE_S and its value is numeric.
+        out = device.capture_shell("getevent -lt", config.ALS_CAPTURE_S)
+        hits = [ln.strip() for ln in out.splitlines() if config.ALS_LUX_EVENT in ln]
+
+        value = None
+        for ln in hits:
+            # getevent -l prints the value as the last token (hex, e.g. 000001a3)
+            m = re.search(config.ALS_LUX_EVENT + r'\s+([0-9a-fx]+)\b', ln, re.I)
+            if m:
+                try:
+                    int(m.group(1), 16)      # numeric (hex) value?
+                    value = m.group(1)
+                    break
+                except ValueError:
+                    continue
+
+        w = config.ALS_CAPTURE_S
+        if value is not None:
+            return ("als lux", True,
+                    f"{config.ALS_LUX_EVENT} received within {w}s "
+                    f"({len(hits)} events, value={value})")
+        if hits:
             return ("als lux", False,
-                    f"ALS node (name={config.ALS_NODE_NAME}) not found under "
-                    f"{config.ALS_INPUT_DIR}")
-
-        device.shell(f'echo 1 > "{node}/config/enable"', timeout=10)
-        try:
-            if sys.stdin.isatty():
-                # interactive: compare a dark reading vs a bright reading.
-                print(f"\n>>> [als] 請【遮住】ALS 感測器（暗環境）。")
-                input(">>> [als] 遮好後按 Enter…")
-                device.shell("sleep 1")
-                dark, vdark = self._als_read(device, node)
-                print(f">>> [als] 暗：lux={dark} valid={vdark}")
-
-                print(f">>> [als] 請【照亮】ALS 感測器（亮環境）。")
-                input(">>> [als] 照好後按 Enter…")
-                device.shell("sleep 1")
-                bright, vbright = self._als_read(device, node)
-                print(f">>> [als] 亮：lux={bright} valid={vbright}")
-
-                valid_ok = vdark == "1" and vbright == "1"
-                got = dark is not None and bright is not None
-                cmp_ok = got and dark < bright
-                ok = valid_ok and cmp_ok
-                detail = (f"dark lux={dark}(valid={vdark}), bright lux={bright}"
-                          f"(valid={vbright}); dark<bright={cmp_ok}")
-                return ("als lux", ok, detail)
-
-            # non-interactive: no light control -> auto-check valid=1 + numeric lux.
-            device.shell("sleep 1")
-            lux, valid = self._als_read(device, node)
-            ok = valid == "1" and lux is not None
-            detail = (f"valid={valid}, lux={lux} "
-                      f"(NOTE: dark<bright comparison skipped - non-interactive)")
-            return ("als lux", ok, detail)
-        finally:
-            device.shell(f'echo 0 > "{node}/config/enable"', timeout=10)
+                    f"{config.ALS_LUX_EVENT} seen but value not numeric: {_snip(hits[0])}")
+        return ("als lux", False, f"no {config.ALS_LUX_EVENT} within {w}s")
 
     # ---- run all, aggregate --------------------------------------------------
     def check(self, device):
