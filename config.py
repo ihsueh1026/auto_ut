@@ -35,6 +35,25 @@ FASTBOOT = "fastboot"
 LSLINK_CLI = "lslink_cli"
 SERDES_PING_NODE = "/sys/bus/i2c/devices/9-0020/ping"
 
+# --- Sensor tests (Qualcomm SSC "see" tools) -----------------------------------
+SENSOR_JSON_DIR = "/data/vendor/sensors"        # where see_selftest drops results
+# whoami: `ssc_sensor_info -sensor=<s> | grep NAME` must report this chip.
+SENSOR_WHOAMI = {"accel": "lsm6dsv", "mag": "bmm350"}
+# streaming (`see_workhorse`) events must carry this sample status.
+SENSOR_STREAM_STATUS = "SNS_STD_SENSOR_SAMPLE_STATUS_ACCURACY_HIGH"
+# self-test (`see_selftest -testtype=hw`) result json per sensor + expected type.
+SENSOR_SELFTEST_JSON = {
+    "accel": "accel_STMicro_see_salt.json",
+    "gyro":  "gyro_STMicro_see_salt.json",
+    "mag":   "mag_Bosch_see_salt.json",
+}
+SENSOR_SELFTEST_TYPE = "SNS_PHYSICAL_SENSOR_TEST_TYPE_HW"
+# ALS (ambient light): i2c input dir, expected whoami name, and the node `name`
+# used to locate the iio/input node that exposes config/enable + data/lux|valid.
+ALS_INPUT_DIR = "/sys/bus/i2c/devices/9-0039/input"
+ALS_WHOAMI = "tsl2522"
+ALS_NODE_NAME = "als"
+
 # --- Timeouts (seconds) --------------------------------------------------------
 FASTBOOT_WAIT_S = 90       # after `adb reboot bootloader`, wait for fastboot
 FLASH_TIMEOUT_S = 1800     # flash_all.bat whole run

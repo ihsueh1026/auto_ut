@@ -9,11 +9,13 @@ import time
 
 
 class Device:
-    def __init__(self, serial=None, adb="adb", fastboot="fastboot", log=print):
+    def __init__(self, serial=None, adb="adb", fastboot="fastboot", log=print,
+                 verbose=False):
         self.serial = serial
         self.adb_bin = adb
         self.fastboot_bin = fastboot
         self.log = log
+        self.verbose = verbose        # when True, shell() echoes command + output
 
     # ---- low level ----------------------------------------------------------
     def _sel(self, tool):
@@ -36,7 +38,20 @@ class Device:
         return self._run(self._sel(self.fastboot_bin) + list(args), timeout)
 
     def shell(self, cmd, timeout=60):
-        return self.adb("shell", cmd, timeout=timeout)
+        rc, out = self.adb("shell", cmd, timeout=timeout)
+        if self.verbose:
+            self._echo_shell(cmd, rc, out)
+        return rc, out
+
+    def _echo_shell(self, cmd, rc, out, max_lines=200):
+        """Live-print a shell command + its output through self.log (verbose)."""
+        self.log(f"[sh] {cmd}")
+        lines = (out or "").splitlines()
+        for line in lines[:max_lines]:
+            self.log(f"     | {line}")
+        if len(lines) > max_lines:
+            self.log(f"     | ... ({len(lines) - max_lines} more lines)")
+        self.log(f"     -> rc={rc}")
 
     def getprop(self, name, timeout=15):
         rc, out = self.shell("getprop " + name, timeout=timeout)

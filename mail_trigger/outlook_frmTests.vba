@@ -28,7 +28,8 @@ Private WithEvents btnCancel As MSForms.CommandButton
 ' "key|label" per test item; ; separated. Matches autotest.py TEST_REGISTRY.
 Private Const TESTS As String = _
     "boot|Boot health  (adb device + dmesg scan);" & _
-    "serdes|SerDes / LSLink  (ping + flashid / switch / version 0x13)"
+    "serdes|SerDes / LSLink  (ping + flashid / switch / version 0x13);" & _
+    "sensors|Sensors  (IMU / Mag whoami + streaming + selftest, ALS)"
 
 ' keys ticked by default (comma list). Others start unticked.
 Private Const DEFAULT_ON As String = "boot"

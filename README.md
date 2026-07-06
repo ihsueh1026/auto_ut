@@ -26,6 +26,26 @@ UNC .zip ──下載/解壓──► image dir ──flash_all.bat──► 裝
 
 ## 用法
 
+**重跑測試、不重燒 image** —— 加 `--skip-flash`，跳過下載+燒入，直接對現在 adb 連著的裝置跑：
+
+```bash
+python autotest.py --skip-flash                     # 不燒，跑全部測項
+python autotest.py --skip-flash --tests sensors     # 不燒，只跑感測器
+python autotest.py --skip-flash --tests boot,serdes,sensors
+run.bat --skip-flash --tests sensors                # Windows launcher（跑完停住顯示結果）
+./run.sh --skip-flash --tests serdes                # Linux/WSL/macOS launcher
+```
+可反覆重跑、換 `--tests` 組合都不會重燒；多台裝置加 `--serial <序號>`。（想重跑功能測又不被
+開機健檢 gating，就別選 `boot`，例如只 `--tests sensors`。）
+
+**看測試過程的 log** —— 加 `-v` / `--verbose`，會把每個 `adb shell` 指令與其輸出即時印出來
+（`[sh] <cmd>` 後接 `| <每行輸出>`、`-> rc=`），console 即時看得到、也一併寫進 `_ut_work/logs/`：
+
+```bash
+python autotest.py --skip-flash --tests sensors -v
+run.bat --skip-flash --tests serdes --verbose
+```
+
 建議用 launcher 而非直接叫 python —— 它跑完會停住顯示結果（Windows 用 `run.bat` 的
 `pause`，Linux/macOS/WSL 用 `run.sh`，互動終端會等你按 Enter），**視窗不會一結束就關**；
 參數原樣傳入（例如 `run.bat --ask`、`./run.sh --skip-flash`）。
@@ -52,7 +72,8 @@ python autotest.py --serial 1234abcd --force
 
 主要參數：`--build` / `--ask` / `--local-dir` / `--work` / `--serial` /
 `--skip-download`（沿用已下載的）/ `--skip-flash` / `--force` /
-`--tests` / `--boot-timeout` / `--fastboot-wait` / `--flash-timeout`。
+`--tests` / `-v`/`--verbose`（即時印指令與輸出）/
+`--boot-timeout` / `--fastboot-wait` / `--flash-timeout`。
 
 離開碼：全部 PASS → `0`，否則 `1`。
 
@@ -64,18 +85,20 @@ python autotest.py --serial 1234abcd --force
 |-----|------|--------|
 | `boot` | `boot_health` | 開機健檢（critical，失敗會 SKIP 其餘）|
 | `serdes` | `lslink` / `Platform_SerDes.GZI3` | SerDes/LSLink 一測項：`cat /sys/bus/i2c/devices/9-0020/ping`==`ok`（需 root）→`switch golden`→`flashid main/sub`(LS 4MiB W25Q32JW)+`main-hs/sub-hs`(HS 16MiB W25Q128JW)→`switch feature`→`version main/sub`==`0x13` |
+| `sensors` | `sensor` / `Platform_Sensor.GZI3` | 感測器一測項（需 root，SSC `see` 工具）：IMU whoami(accel=`lsm6dsv`)/streaming/selftest(accel+gyro，`test_type` HW×2 + `test_passed:1`)、Mag whoami(`bmm350`)/streaming/selftest、ALS whoami(`tsl2522`) + lux（只判 `valid=1`+讀到 lux 數值；明暗比較為人工註記，不 FAIL） |
 
 ```bash
 python autotest.py --tests serdes            # 只跑 SerDes/LSLink
-python autotest.py --tests boot,serdes       # 開機健檢 + SerDes
-python autotest.py --skip-flash --tests serdes   # 不燒，只跑 SerDes 測項
+python autotest.py --tests sensors           # 只跑感測器
+python autotest.py --tests boot,serdes,sensors   # 開機健檢 + 兩組功能測
+python autotest.py --skip-flash --tests sensors  # 不燒，只跑感測器測項
 ```
 
 未知的 key 會直接報錯（列出可用清單），且在**燒入前**就驗證，不會白燒一輪。
 `lslink_cli` 名稱與 ping 節點路徑在 `config.LSLINK_CLI` / `config.SERDES_PING_NODE`。
 
 **從 mail 巨集選測項**：Outlook 按鈕觸發時會跳一個**勾選視窗**（`frmTests`，列出 `boot` /
-`serdes` 供打勾，**預設只勾 `boot`**、Run/Cancel），選擇經 `run_on_mail.py --tests` 一路傳到
+`serdes` / `sensors` 供打勾，**預設只勾 `boot`**、Run/Cancel），選擇經 `run_on_mail.py --tests` 一路傳到
 `autotest.py`。巨集需安裝兩塊：`mail_trigger/outlook_macro.vba`（標準 Module）＋
 `mail_trigger/outlook_frmTests.vba`（貼進一個名為 `frmTests` 的空白 UserForm，勾選框由程式碼動態
 建立，免拉控制項、免開「信任 VBA 專案物件模型」）。
@@ -95,6 +118,7 @@ tests/
   base.py              Test ABC + TestResult
   test_boot_health.py  開機健檢（critical）
   test_serdes.py       SerDes/LSLink 單測項（ping + flashid/switch/version）
+  test_sensors.py      感測器單測項（IMU/Mag whoami+streaming+selftest、ALS）
 ```
 
 ## 擴充

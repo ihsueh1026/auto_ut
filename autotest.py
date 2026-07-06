@@ -30,6 +30,7 @@ from core.reporter import report
 from tests.base import TestResult, FAIL, ERROR
 from tests.test_boot_health import BootHealthTest
 from tests.test_serdes import SerDesTest
+from tests.test_sensors import SensorTest
 
 
 class Tee:
@@ -54,6 +55,8 @@ TEST_REGISTRY = [
      lambda a: BootHealthTest(boot_timeout_s=a.boot_timeout)),
     ("serdes", {"serdes", "lslink", "platform_serdes.gzi3"},
      lambda a: SerDesTest(cli=config.LSLINK_CLI, ping_node=config.SERDES_PING_NODE)),
+    ("sensors", {"sensors", "sensor", "platform_sensor.gzi3"},
+     lambda a: SensorTest(json_dir=config.SENSOR_JSON_DIR)),
 ]
 
 
@@ -103,6 +106,8 @@ def parse_args(argv):
                    help="which tests to run: comma list of keys/aliases/case-ids "
                         "(e.g. 'boot,002' or '001'); 'all' = everything. "
                         f"Available: {test_keys()}")
+    p.add_argument("-v", "--verbose", action="store_true",
+                   help="echo each adb shell command and its output live during tests")
     p.add_argument("--force", action="store_true",
                    help="force re-copy and re-unzip even if cached")
     p.add_argument("--boot-timeout", type=int, default=config.BOOT_TIMEOUT_S)
@@ -132,9 +137,11 @@ def main(argv=None):
     log(f"   serial     = {args.serial or '(single device)'}")
     log(f"   skip-flash = {args.skip_flash}")
     log(f"   tests      = {args.tests}")
+    log(f"   verbose    = {args.verbose}")
     log("=" * 60)
 
-    device = Device(serial=args.serial, adb=config.ADB, fastboot=config.FASTBOOT, log=log)
+    device = Device(serial=args.serial, adb=config.ADB, fastboot=config.FASTBOOT,
+                    log=log, verbose=args.verbose)
     meta = {"build": args.build if not args.local_dir else args.local_dir,
             "serial": args.serial or "single", "skip_flash": args.skip_flash,
             "tests": args.tests}
